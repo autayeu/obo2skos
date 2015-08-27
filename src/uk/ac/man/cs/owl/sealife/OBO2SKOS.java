@@ -146,7 +146,7 @@ public class OBO2SKOS {
 
         String frag = ind.getURI().getFragment();
         String OBO_ID = frag.replaceFirst("_", ":");
-        axList.add(factory.getOWLDataPropertyAssertionAxiom(ind, factory.getOWLDataProperty(SKOSVocabulary.NOTATION.getURI()), OBO_ID));
+        axList.add(factory.getOWLDataPropertyAssertionAxiom(ind, factory.getOWLDataProperty(URI.create("http://www.w3.org/2004/02/skos/core#notation")), OBO_ID));
 
         
 
