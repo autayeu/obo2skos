@@ -9,7 +9,7 @@ To run the converter:
 EXAMPLE:
 ---------
 
-	./run.sh --input='file:/Users/simon/input/cell.obo' --output=file:/Users/simon/output/cell.skos.rdf --baseURI=http://example.com/obo2skos --ignoreObsolete=false
+	./run.sh --input='file:./input/cell.obo' --output=file:./output/cell.skos.rdf --baseURI=http://example.com/obo2skos --ignoreObsolete=false
 
 ARGS:
 -----
