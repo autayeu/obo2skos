@@ -1,0 +1,1 @@
+java -Xms400M -Xmx800M -classpath 'classes/production/OBOtoSKOSConverter/:lib/owlapi-bin.jar' uk.ac.man.cs.owl.sealife.RunO2S $@
