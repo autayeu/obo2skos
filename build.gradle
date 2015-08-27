@@ -1,0 +1,22 @@
+apply plugin: 'java'
+
+sourceSets {
+	main {
+		java {
+			srcDir 'src'
+        	}
+	}
+}
+
+dependencies {
+ 	compile fileTree(dir: 'lib', include: '*.jar')
+}
+
+// embed dependencies
+jar {
+	from configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+
+	manifest {
+        	attributes("Main-Class": "uk.ac.man.cs.owl.sealife.RunO2S")
+	}
+}
