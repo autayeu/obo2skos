@@ -5,7 +5,7 @@
     <groupId>uk.ac.man.cs.owl.sealife</groupId>
     <artifactId>obo2skos</artifactId>
     <version>1.0.0</version>
-    <packaging>pom</packaging>
+    <packaging>jar</packaging>
 
     <name>obo2skos</name>
 
@@ -18,4 +18,24 @@
         </dependency>
     </dependencies>
 
+    <build>
+      <plugins>
+        <plugin>
+          <artifactId>maven-assembly-plugin</artifactId>
+          <version>2.5.3</version>
+          <configuration>
+            <descriptor>src/assembly/assembl.xml</descriptor>
+          </configuration>
+          <executions>
+            <execution>
+              <id>create-archive</id>
+              <phase>package</phase>
+              <goals>
+                <goal>single</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </build>
 </project>
