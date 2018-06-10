@@ -1,15 +1,3 @@
-package uk.ac.man.cs.owl.sealife;
-
-
-
-import org.coode.owlapi.obo12.parser.OBOVocabulary;
-import org.semanticweb.owlapi.model.*;
-import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
-import org.semanticweb.owlapi.vocab.SKOSVocabulary;
-
-import java.net.URI;
-import java.util.Map;
-import java.util.HashMap;
 /*
  * Copyright (C) 2007, University of Manchester
  *
@@ -32,43 +20,48 @@ import java.util.HashMap;
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
+package uk.ac.man.cs.owl.sealife;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import org.obolibrary.obo2owl.Obo2OWLConstants.Obo2OWLVocabulary;
+import org.semanticweb.owlapi.model.HasIRI;
+import org.semanticweb.owlapi.model.IRI;
+import org.semanticweb.owlapi.model.OWLDataFactory;
+import org.semanticweb.owlapi.model.OWLDataProperty;
+import org.semanticweb.owlapi.model.OWLOntologyManager;
+import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
+import org.semanticweb.owlapi.vocab.SKOSVocabulary;
 
 /**
- * Author: Simon Jupp<br>
- * Date: Jan 28, 2008<br>
- * The University of Manchester<br>
- * Bio-Health Informatics Group<br>
+ * @author Simon Jupp
+ * @author <a href="http://autayeu.com/">Aliaksandr Autayeu</a>
  */
 public class OBOAnnotationToSKOSMapper {
 
-    Map<IRI, OWLDataProperty> annoMap;
-    OWLOntologyManager man;
-    OWLOntology ontology;
-    OWLDataFactory factory;
+  private final Map<IRI, OWLDataProperty> annotationMap;
 
+  public OBOAnnotationToSKOSMapper(final OWLOntologyManager manager) {
+    final OWLDataFactory factory = manager.getOWLDataFactory();
 
-    public OBOAnnotationToSKOSMapper(OWLOntologyManager man, OWLOntology ontology) {
+    final Map<IRI, OWLDataProperty> temp = new HashMap<>();
+    put(temp, OWLRDFVocabulary.RDFS_LABEL, SKOSVocabulary.PREFLABEL, factory);
+    put(temp, Obo2OWLVocabulary.IRI_OIO_hasRelatedSynonym, SKOSVocabulary.ALTLABEL, factory);
+    put(temp, Obo2OWLVocabulary.IRI_OIO_hasExactSynonym, SKOSVocabulary.ALTLABEL, factory);
+    put(temp, Obo2OWLVocabulary.IRI_OIO_hasNarrowSynonym, SKOSVocabulary.ALTLABEL, factory);
+    put(temp, Obo2OWLVocabulary.IRI_OIO_hasBroadSynonym, SKOSVocabulary.ALTLABEL, factory);
+    put(temp, Obo2OWLVocabulary.IRI_IAO_0000115, SKOSVocabulary.DEFINITION, factory);
 
-        this.man = man;
-        this.ontology = ontology;
-        factory = man.getOWLDataFactory();
+    this.annotationMap = Collections.unmodifiableMap(temp);
+  }
 
-        annoMap = new HashMap<IRI, OWLDataProperty>();
-        annoMap.put(OWLRDFVocabulary.RDFS_LABEL.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.PREFLABEL.getIRI()));
-        annoMap.put(OBOVocabulary.RELATED_SYNONYM.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.ALTLABEL.getIRI()));
-        annoMap.put(OBOVocabulary.EXACT_SYNONYM.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.ALTLABEL.getIRI()));
-        annoMap.put(OBOVocabulary.SYNONYM.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.ALTLABEL.getIRI()));
-        annoMap.put(OBOVocabulary.NARROW_SYNONYM.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.ALTLABEL.getIRI()));
-        annoMap.put(OBOVocabulary.BROAD_SYNONYM.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.ALTLABEL.getIRI()));
-        annoMap.put(OBOVocabulary.ALT_ID.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.ALTLABEL.getIRI()));
-        annoMap.put(OBOVocabulary.DEF.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.DEFINITION.getIRI()));
-        annoMap.put(OBOVocabulary.COMMENT.getIRI(), factory.getOWLDataProperty(SKOSVocabulary.COMMENT.getIRI()));
+  private static void put(final Map<IRI, OWLDataProperty> map,
+      final HasIRI oProp, final HasIRI skosProp, final OWLDataFactory factory) {
+    map.put(oProp.getIRI(), factory.getOWLDataProperty(skosProp.getIRI()));
+  }
 
-    }
-
-    public Map<IRI, OWLDataProperty> getAnnotationMap() {
-        return annoMap;
-    }
-
-
+  public Map<IRI, OWLDataProperty> getAnnotationMap() {
+    return annotationMap;
+  }
 }

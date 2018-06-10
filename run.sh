@@ -1,1 +1,0 @@
-java -Xms400M -Xmx800M -classpath 'target/obo2skos-1.0.0-jar-with-dependencies.jar' uk.ac.man.cs.owl.sealife.RunO2S $@
