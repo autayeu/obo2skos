@@ -102,6 +102,7 @@ public class Obo2Skos {
   private Set<String> includeNamespaces = Collections.emptySet();
   private Set<String> excludeNamespaces = Collections.emptySet();
   private boolean includeObsolete = false;
+  private boolean includeUnmappedProperties = false;
 
 
   public Obo2Skos(final OWLOntologyManager manager, final OWLOntology inputOntology) {
@@ -200,7 +201,7 @@ public class Obo2Skos {
               .map(this::getSkosScheme).orElse(skosConceptScheme);
           axioms.add(factory.
               getOWLObjectPropertyAssertionAxiom(inSchemeProperty, concept, scheme));
-        } else {
+        } else if (includeUnmappedProperties) {
           // for all other annotation axioms, just add them as they are
           axioms.add(factory.getOWLAnnotationAssertionAxiom(concept.getIRI(), anno));
         }
@@ -329,7 +330,10 @@ public class Obo2Skos {
   public void setExcludeNamespaces(final Collection<String> excludeNamespaces) {
     this.excludeNamespaces = excludeNamespaces == null ? Collections.emptySet() :
         Collections.unmodifiableSet(new HashSet<>(excludeNamespaces));
-    ;
+  }
+
+  public void setIncludeUnmappedProperties(boolean includeUnmappedProperties) {
+    this.includeUnmappedProperties = includeUnmappedProperties;
   }
 
   private static <T> T parseCLIOptions(final String[] args,
@@ -372,6 +376,7 @@ public class Obo2Skos {
     obo2skos.setIncludeObsolete(options.isIncludeObsolete());
     obo2skos.setIncludeNamespaces(options.getIncludeNamespaces());
     obo2skos.setExcludeNamespaces(options.getExcludeNamespaces());
+    obo2skos.setIncludeUnmappedProperties(options.isIncludeUnmappedProperties());
 
     log.info("Converting...");
     final OWLOntology skos = obo2skos.convert();

@@ -22,6 +22,8 @@ public class Obo2SkosOptions {
   private List<String> includeNamespaces;
   @Option(name = "-excludeNamespace", usage = "Namespace to exclude. Repeat to exclude several namespaces.")
   private List<String> excludeNamespaces;
+  @Option(name = "-includeUnmappedProperties", usage = "If true, include also unrecognized properties as oboInOwl")
+  private boolean includeUnmappedProperties = false;
 
   public Path getInput() {
     return input;
@@ -71,6 +73,14 @@ public class Obo2SkosOptions {
     this.excludeNamespaces = excludeNamespaces;
   }
 
+  public boolean isIncludeUnmappedProperties() {
+    return includeUnmappedProperties;
+  }
+
+  public void setIncludeUnmappedProperties(boolean includeUnmappedProperties) {
+    this.includeUnmappedProperties = includeUnmappedProperties;
+  }
+
   @Override
   public String toString() {
     return "Obo2SkosOptions{" +
@@ -80,6 +90,7 @@ public class Obo2SkosOptions {
         ", baseUri='" + baseUri + '\'' +
         ", includeNamespaces=" + includeNamespaces +
         ", excludeNamespaces=" + excludeNamespaces +
+        ", includeUnmappedProperties=" + includeUnmappedProperties +
         '}';
   }
 }

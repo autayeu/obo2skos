@@ -35,6 +35,8 @@ import org.semanticweb.owlapi.vocab.OWLRDFVocabulary;
 import org.semanticweb.owlapi.vocab.SKOSVocabulary;
 
 /**
+ * Maps OBO properties (as converted by OboInOwl) to SKOS.
+ *
  * @author Simon Jupp
  * @author <a href="http://autayeu.com/">Aliaksandr Autayeu</a>
  */
@@ -52,6 +54,7 @@ public class OBOAnnotationToSKOSMapper {
     put(temp, Obo2OWLVocabulary.IRI_OIO_hasNarrowSynonym, SKOSVocabulary.ALTLABEL, factory);
     put(temp, Obo2OWLVocabulary.IRI_OIO_hasBroadSynonym, SKOSVocabulary.ALTLABEL, factory);
     put(temp, Obo2OWLVocabulary.IRI_IAO_0000115, SKOSVocabulary.DEFINITION, factory);
+    put(temp, OWLRDFVocabulary.RDFS_COMMENT, SKOSVocabulary.NOTE, factory);
 
     this.annotationMap = Collections.unmodifiableMap(temp);
   }
