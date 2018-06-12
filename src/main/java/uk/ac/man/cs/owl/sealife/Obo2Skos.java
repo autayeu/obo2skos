@@ -87,13 +87,16 @@ public class Obo2Skos {
   private final OWLOntologyManager manager;
   private final OWLOntology inputOntology;
   private final OWLDataFactory factory;
-  private final OWLAnnotationProperty obsoleteProperty;
-  private final OWLAnnotationProperty defaultNamespace;
-  private final OWLObjectProperty inSchemeProperty;
   private final OWLClass skosConceptClass;
   private final OWLClass skosConceptSchemeClass;
   private final Set<OWLAxiom> axioms;
   private final OBOAnnotationToSKOSMapper mapper;
+
+  private final OWLAnnotationProperty obsoleteProperty;
+  private final OWLAnnotationProperty defaultNamespace;
+  private final OWLObjectProperty inSchemeProperty;
+  private final OWLObjectProperty broaderProperty;
+  private final OWLObjectProperty narrowerProperty;
 
   private OWLOntology skosOntology;
   private OWLIndividual skosConceptScheme;
@@ -113,6 +116,8 @@ public class Obo2Skos {
     this.defaultNamespace = factory.getOWLAnnotationProperty(
         OIOVOCAB_IRI_PREFIX + OboFormatTag.TAG_DEFAULT_NAMESPACE.getTag());
     this.inSchemeProperty = factory.getOWLObjectProperty(SKOSVocabulary.INSCHEME);
+    this.broaderProperty = factory.getOWLObjectProperty(SKOSVocabulary.BROADER);
+    this.narrowerProperty = factory.getOWLObjectProperty(SKOSVocabulary.NARROWER);
     this.skosConceptClass = factory.getOWLClass(SKOSVocabulary.CONCEPT);
     this.skosConceptSchemeClass = factory.getOWLClass(SKOSVocabulary.CONCEPTSCHEME);
 
@@ -241,9 +246,9 @@ public class Obo2Skos {
   }
 
   private void addSKOSRelationships(final OWLNamedIndividual concept,
-      final Stream<OWLClassExpression> classes) {
-    classes.forEach(desc -> {
-      if (desc.equals(factory.getOWLThing())) {
+      final Stream<OWLClassExpression> superClasses) {
+    superClasses.forEach(superClass -> {
+      if (superClass.equals(factory.getOWLThing())) {
         // make the concept top concept
         final OWLObjectProperty hasTopConcept =
             factory.getOWLObjectProperty(SKOSVocabulary.HASTOPCONCEPT);
@@ -251,29 +256,16 @@ public class Obo2Skos {
             .getOWLObjectPropertyAssertionAxiom(hasTopConcept, skosConceptScheme, concept));
       }
 
-      if (desc instanceof OWLClass) {
+      if (superClass instanceof OWLClass) {
         // this class is broader than the current class
-
-        // create the obo is-a (and the inverse super-class-of) sub property of skos:broader/skos:narrower respectively.
-        OWLObjectProperty isAprop = factory.getOWLObjectProperty(baseURI + frag + "is-a");
-        OWLAxiom ax = factory.getOWLSubObjectPropertyOfAxiom(isAprop,
-            factory.getOWLObjectProperty(SKOSVocabulary.BROADER));
-        axioms.add(ax);
-
-        OWLObjectProperty superClassProp =
-            factory.getOWLObjectProperty(baseURI + frag + "super-class-of");
-        OWLAxiom ax1 = factory.getOWLSubObjectPropertyOfAxiom(superClassProp,
-            factory.getOWLObjectProperty(SKOSVocabulary.NARROWER));
-        axioms.add(ax1);
-
-        OWLNamedIndividual ind1 = factory.getOWLNamedIndividual(
-            baseURI + frag + desc.asOWLClass().getIRI().getFragment());
-        axioms.add(getSKOSConceptAxiom(ind1));
+        final OWLNamedIndividual broaderConcept = factory.getOWLNamedIndividual(
+            baseURI + frag + superClass.asOWLClass().getIRI().getFragment());
+        axioms.add(getSKOSConceptAxiom(broaderConcept));
 
         // add the property assertion (and the inverse)
-        axioms.add(factory.getOWLObjectPropertyAssertionAxiom(isAprop, concept, ind1));
-        axioms.add(factory.getOWLObjectPropertyAssertionAxiom(superClassProp, ind1, concept));
-      } else if (desc instanceof OWLObjectSomeValuesFrom) {
+        axioms.add(factory.getOWLObjectPropertyAssertionAxiom(broaderProperty, concept, broaderConcept));
+        axioms.add(factory.getOWLObjectPropertyAssertionAxiom(narrowerProperty, broaderConcept, concept));
+      } else if (superClass instanceof OWLObjectSomeValuesFrom) {
         /*
          * create the skos:related relationships
          * It is here that you would need to do any manual mapping for certain ObjectProperties to Broader or Narrower
@@ -283,7 +275,7 @@ public class Obo2Skos {
 
         // get the filler of the existential restriction
         // it should be a class for most OBO ontologies....
-        OWLObjectSomeValuesFrom rest = (OWLObjectSomeValuesFrom) desc;
+        OWLObjectSomeValuesFrom rest = (OWLObjectSomeValuesFrom) superClass;
         if (!rest.getFiller().isAnonymous()) {
           OWLClass relatedClass = (OWLClass) rest.getFiller();
 
