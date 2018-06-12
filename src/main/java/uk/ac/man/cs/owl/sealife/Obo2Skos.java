@@ -32,8 +32,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -140,15 +140,15 @@ public class Obo2Skos {
     // copy the original ontology annotation axioms
     if (skosOntology.getOntologyID().getOntologyIRI().isPresent()) {
       final IRI subject = skosOntology.getOntologyID().getOntologyIRI().get();
-      axioms.addAll(inputOntology.annotations()
+      inputOntology.annotations()
           .map(a -> factory.getOWLAnnotationAssertionAxiom(subject, a))
-          .collect(Collectors.toSet())
-      );
+          .forEach(axioms::add);
     }
 
     // add the structure of the vocabulary using the object properties
     inputOntology.classesInSignature().forEach(cls -> {
       if (!isObsolete(cls) || includeObsolete) {
+        final String fragment = cls.getIRI().getFragment();
         final String namespace = EntitySearcher.getAnnotations(cls, inputOntology)
             .filter(a -> Obo2OWLVocabulary.IRI_OIO_hasOboNamespace.sameIRI(a.getProperty()))
             .findFirst()
@@ -161,7 +161,7 @@ public class Obo2Skos {
             (excludeNamespaces.isEmpty() || !excludeNamespaces.contains(namespace))
             ) {
           final OWLNamedIndividual concept =
-              factory.getOWLNamedIndividual(baseURI + frag + cls.getIRI().getFragment());
+              factory.getOWLNamedIndividual(baseURI + frag + fragment);
           axioms.add(getSKOSConceptAxiom(concept));
 
           // get the sub and super classes, convert to SKOS Concepts, include broader/narrower relationships
@@ -193,6 +193,7 @@ public class Obo2Skos {
       final Stream<OWLAnnotation> annos) {
     // Need a method in the OWL API to get Annotation by URI...
     final Map<IRI, OWLDataProperty> annoMap = mapper.getAnnotationMap();
+    final AtomicBoolean inSchemeAdded = new AtomicBoolean(false);
     annos.forEach(anno -> {
       final OWLDataProperty prop = annoMap.get(anno.getProperty().getIRI());
       if (prop != null && anno.getValue().asLiteral().isPresent()) {
@@ -206,12 +207,19 @@ public class Obo2Skos {
               .map(this::getSkosScheme).orElse(skosConceptScheme);
           axioms.add(factory.
               getOWLObjectPropertyAssertionAxiom(inSchemeProperty, concept, scheme));
+          inSchemeAdded.set(true);
         } else if (includeUnmappedProperties) {
           // for all other annotation axioms, just add them as they are
           axioms.add(factory.getOWLAnnotationAssertionAxiom(concept.getIRI(), anno));
         }
       }
     });
+
+    // ensure inScheme is set. we need it, so set to default if missing
+    if (!inSchemeAdded.get()) {
+      axioms.add(factory.
+          getOWLObjectPropertyAssertionAxiom(inSchemeProperty, concept, skosConceptScheme));
+    }
 
     // This is an after thought, whole script needs re-writing if i were to do this properly anyway
     // want to use SKOS note to keep the original OBO identifier.
