@@ -1,6 +1,7 @@
 package uk.ac.man.cs.owl.sealife;
 
 import java.nio.file.Path;
+import java.util.List;
 import org.kohsuke.args4j.Option;
 
 /**
@@ -17,6 +18,10 @@ public class Obo2SkosOptions {
   private boolean includeObsolete = false;
   @Option(name = "-baseURI", usage = "Base URI for converted SKOS file.")
   private String baseUri = "http://example.com/obo2skos";
+  @Option(name = "-includeNamespace", usage = "Namespace to include. Repeat to include several namespaces.")
+  private List<String> includeNamespaces;
+  @Option(name = "-excludeNamespace", usage = "Namespace to exclude. Repeat to exclude several namespaces.")
+  private List<String> excludeNamespaces;
 
   public Path getInput() {
     return input;
@@ -50,6 +55,22 @@ public class Obo2SkosOptions {
     this.baseUri = baseUri;
   }
 
+  public List<String> getIncludeNamespaces() {
+    return includeNamespaces;
+  }
+
+  public void setIncludeNamespaces(List<String> includeNamespaces) {
+    this.includeNamespaces = includeNamespaces;
+  }
+
+  public List<String> getExcludeNamespaces() {
+    return excludeNamespaces;
+  }
+
+  public void setExcludeNamespaces(List<String> excludeNamespaces) {
+    this.excludeNamespaces = excludeNamespaces;
+  }
+
   @Override
   public String toString() {
     return "Obo2SkosOptions{" +
@@ -57,6 +78,8 @@ public class Obo2SkosOptions {
         ", output=" + output +
         ", includeObsolete=" + includeObsolete +
         ", baseUri='" + baseUri + '\'' +
+        ", includeNamespaces=" + includeNamespaces +
+        ", excludeNamespaces=" + excludeNamespaces +
         '}';
   }
 }

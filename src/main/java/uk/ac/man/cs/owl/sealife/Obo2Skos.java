@@ -26,6 +26,7 @@ import static org.obolibrary.obo2owl.Obo2OWLConstants.OIOVOCAB_IRI_PREFIX;
 
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.OptionHandlerFilter;
@@ -43,6 +45,7 @@ import org.semanticweb.owlapi.model.AddAxiom;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLAnnotation;
 import org.semanticweb.owlapi.model.OWLAnnotationProperty;
+import org.semanticweb.owlapi.model.OWLAnnotationValue;
 import org.semanticweb.owlapi.model.OWLAxiom;
 import org.semanticweb.owlapi.model.OWLClass;
 import org.semanticweb.owlapi.model.OWLClassExpression;
@@ -96,7 +99,8 @@ public class Obo2Skos {
   private OWLIndividual skosConceptScheme;
   private Map<String, OWLIndividual> skosConceptSchemes;
   private String baseURI = "http://example.com/obo2skos";
-
+  private Set<String> includeNamespaces = Collections.emptySet();
+  private Set<String> excludeNamespaces = Collections.emptySet();
   private boolean includeObsolete = false;
 
 
@@ -139,13 +143,27 @@ public class Obo2Skos {
     // add the structure of the vocabulary using the object properties
     inputOntology.classesInSignature().forEach(cls -> {
       if (!isObsolete(cls) || includeObsolete) {
-        // get the sub and super classes, convert to SKOS Concepts, include broader/narrower relationships
-        addSKOSRelationships(cls,
-            EntitySearcher.getSuperClasses(cls, inputOntology).collect(Collectors.toSet()));
+        final String namespace = EntitySearcher.getAnnotations(cls, inputOntology)
+            .filter(a -> Obo2OWLVocabulary.IRI_OIO_hasOboNamespace.sameIRI(a.getProperty()))
+            .findFirst()
+            .map(OWLAnnotation::getValue)
+            .flatMap(OWLAnnotationValue::asLiteral)
+            .map(OWLLiteral::getLiteral)
+            .orElse(null);
 
-        // add the annotation properties as skos data type properties
-        addSKOSDataProperties(cls,
-            EntitySearcher.getAnnotations(cls, inputOntology).collect(Collectors.toSet()));
+        if ((includeNamespaces.isEmpty() || includeNamespaces.contains(namespace)) &&
+            (excludeNamespaces.isEmpty() || !excludeNamespaces.contains(namespace))
+            ) {
+          final OWLNamedIndividual concept =
+              factory.getOWLNamedIndividual(baseURI + frag + cls.getIRI().getFragment());
+          axioms.add(getSKOSConceptAxiom(concept));
+
+          // get the sub and super classes, convert to SKOS Concepts, include broader/narrower relationships
+          addSKOSRelationships(concept, EntitySearcher.getSuperClasses(cls, inputOntology));
+
+          // add the annotation properties as skos data type properties
+          addSKOSDataProperties(concept, EntitySearcher.getAnnotations(cls, inputOntology));
+        }
       }
     });
 
@@ -165,14 +183,11 @@ public class Obo2Skos {
         .getAnnotations(cls, inputOntology, obsoleteProperty).findFirst().isPresent();
   }
 
-  private void addSKOSDataProperties(OWLClass cls, Set<OWLAnnotation> annos) {
+  private void addSKOSDataProperties(final OWLNamedIndividual concept,
+      final Stream<OWLAnnotation> annos) {
     // Need a method in the OWL API to get Annotation by URI...
-    final String id = cls.getIRI().getFragment();
-    final OWLNamedIndividual concept = factory.getOWLNamedIndividual(baseURI + frag + id);
-    axioms.add(getSKOSConceptAxiom(concept));
-
     final Map<IRI, OWLDataProperty> annoMap = mapper.getAnnotationMap();
-    for (final OWLAnnotation anno : annos) {
+    annos.forEach(anno -> {
       final OWLDataProperty prop = annoMap.get(anno.getProperty().getIRI());
       if (prop != null && anno.getValue().asLiteral().isPresent()) {
         final String literal = anno.getValue().asLiteral().get().getLiteral();
@@ -190,7 +205,7 @@ public class Obo2Skos {
           axioms.add(factory.getOWLAnnotationAssertionAxiom(concept.getIRI(), anno));
         }
       }
-    }
+    });
 
     // This is an after thought, whole script needs re-writing if i were to do this properly anyway
     // want to use SKOS note to keep the original OBO identifier.
@@ -224,18 +239,15 @@ public class Obo2Skos {
     skosConceptScheme = getSkosScheme(schemeName);
   }
 
-  private void addSKOSRelationships(OWLClass cls, Set<OWLClassExpression> classes) {
-    final OWLIndividual concept =
-        factory.getOWLNamedIndividual(baseURI + frag + cls.getIRI().getFragment());
-    axioms.add(getSKOSConceptAxiom(concept));
-
-    for (final OWLClassExpression desc : classes) {
+  private void addSKOSRelationships(final OWLNamedIndividual concept,
+      final Stream<OWLClassExpression> classes) {
+    classes.forEach(desc -> {
       if (desc.equals(factory.getOWLThing())) {
         // make the concept top concept
         final OWLObjectProperty hasTopConcept =
             factory.getOWLObjectProperty(SKOSVocabulary.HASTOPCONCEPT);
         axioms.add(factory
-                .getOWLObjectPropertyAssertionAxiom(hasTopConcept, skosConceptScheme, concept));
+            .getOWLObjectPropertyAssertionAxiom(hasTopConcept, skosConceptScheme, concept));
       }
 
       if (desc instanceof OWLClass) {
@@ -293,9 +305,8 @@ public class Obo2Skos {
           // add the inverse as well
           axioms.add(factory.getOWLObjectPropertyAssertionAxiom(related, skosConceptInd, concept));
         }
-
       }
-    }
+    });
   }
 
   private OWLAxiom getSKOSConceptAxiom(final OWLIndividual ind) {
@@ -308,6 +319,17 @@ public class Obo2Skos {
 
   public void setBaseURI(String uri) {
     baseURI = uri;
+  }
+
+  public void setIncludeNamespaces(final Collection<String> includeNamespaces) {
+    this.includeNamespaces = includeNamespaces == null ? Collections.emptySet() :
+        Collections.unmodifiableSet(new HashSet<>(includeNamespaces));
+  }
+
+  public void setExcludeNamespaces(final Collection<String> excludeNamespaces) {
+    this.excludeNamespaces = excludeNamespaces == null ? Collections.emptySet() :
+        Collections.unmodifiableSet(new HashSet<>(excludeNamespaces));
+    ;
   }
 
   private static <T> T parseCLIOptions(final String[] args,
@@ -348,6 +370,8 @@ public class Obo2Skos {
     final Obo2Skos obo2skos = new Obo2Skos(manager, inputOntology);
     obo2skos.setBaseURI(options.getBaseUri());
     obo2skos.setIncludeObsolete(options.isIncludeObsolete());
+    obo2skos.setIncludeNamespaces(options.getIncludeNamespaces());
+    obo2skos.setExcludeNamespaces(options.getExcludeNamespaces());
 
     log.info("Converting...");
     final OWLOntology skos = obo2skos.convert();
