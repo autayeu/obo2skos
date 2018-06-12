@@ -1,3 +1,0 @@
-Manifest-Version: 1.0
-Main-Class: uk.ac.man.cs.owl.sealife.RunO2S
-
