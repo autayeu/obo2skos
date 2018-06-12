@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.kohsuke.args4j.CmdLineException;
@@ -107,6 +108,10 @@ public class Obo2Skos {
   private boolean includeObsolete = false;
   private boolean includeUnmappedProperties = false;
 
+  private final LongAdder classes = new LongAdder();
+  private final LongAdder classesProcessed = new LongAdder();
+  private final LongAdder conceptsCreated = new LongAdder();
+
 
   public Obo2Skos(final OWLOntologyManager manager, final OWLOntology inputOntology) {
     this.manager = manager;
@@ -147,7 +152,9 @@ public class Obo2Skos {
 
     // add the structure of the vocabulary using the object properties
     inputOntology.classesInSignature().forEach(cls -> {
+      classes.increment();
       if (!isObsolete(cls) || includeObsolete) {
+        classesProcessed.increment();
         final String fragment = cls.getIRI().getFragment();
         final String namespace = EntitySearcher.getAnnotations(cls, inputOntology)
             .filter(a -> Obo2OWLVocabulary.IRI_OIO_hasOboNamespace.sameIRI(a.getProperty()))
@@ -163,6 +170,7 @@ public class Obo2Skos {
           final OWLNamedIndividual concept =
               factory.getOWLNamedIndividual(baseURI + frag + fragment);
           axioms.add(getSKOSConceptAxiom(concept));
+          conceptsCreated.increment();
 
           // get the sub and super classes, convert to SKOS Concepts, include broader/narrower relationships
           addSKOSRelationships(concept, EntitySearcher.getSuperClasses(cls, inputOntology));
@@ -382,6 +390,9 @@ public class Obo2Skos {
     final OWLOntology skos = obo2skos.convert();
     log.info("Saving...");
     manager.saveOntology(skos, IRI.create(options.getOutput().toFile()));
+    log.info("Classes found: {}", obo2skos.classes.longValue());
+    log.info("Classes processed: {}", obo2skos.classesProcessed.longValue());
+    log.info("Concepts created: {}", obo2skos.conceptsCreated.longValue());
     log.info("Done!");
   }
 }
