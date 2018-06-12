@@ -92,12 +92,14 @@ public class Obo2Skos {
   private final OWLClass skosConceptSchemeClass;
   private final Set<OWLAxiom> axioms;
   private final OBOAnnotationToSKOSMapper mapper;
+  private final Set<OWLNamedIndividual> convertedConcepts;
 
   private final OWLAnnotationProperty obsoleteProperty;
   private final OWLAnnotationProperty defaultNamespace;
   private final OWLObjectProperty inSchemeProperty;
   private final OWLObjectProperty broaderProperty;
   private final OWLObjectProperty narrowerProperty;
+  private final OWLObjectProperty topConceptProperty;
 
   private OWLOntology skosOntology;
   private OWLIndividual skosConceptScheme;
@@ -107,6 +109,8 @@ public class Obo2Skos {
   private Set<String> excludeNamespaces = Collections.emptySet();
   private boolean includeObsolete = false;
   private boolean includeUnmappedProperties = false;
+  private boolean includeUnmappedRelations = false;
+  private boolean includeRelationsToExternalConcepts = false;
 
   private final LongAdder classes = new LongAdder();
   private final LongAdder classesProcessed = new LongAdder();
@@ -123,6 +127,7 @@ public class Obo2Skos {
     this.inSchemeProperty = factory.getOWLObjectProperty(SKOSVocabulary.INSCHEME);
     this.broaderProperty = factory.getOWLObjectProperty(SKOSVocabulary.BROADER);
     this.narrowerProperty = factory.getOWLObjectProperty(SKOSVocabulary.NARROWER);
+    this.topConceptProperty = factory.getOWLObjectProperty(SKOSVocabulary.HASTOPCONCEPT);
     this.skosConceptClass = factory.getOWLClass(SKOSVocabulary.CONCEPT);
     this.skosConceptSchemeClass = factory.getOWLClass(SKOSVocabulary.CONCEPTSCHEME);
 
@@ -130,10 +135,15 @@ public class Obo2Skos {
     this.axioms = new HashSet<>();
     this.mapper = new OBOAnnotationToSKOSMapper(manager);
     this.skosConceptSchemes = new HashMap<>();
+    this.convertedConcepts = new HashSet<>();
   }
 
 
   public OWLOntology convert() throws OWLOntologyCreationException {
+    convertedConcepts.clear();
+    axioms.clear();
+    skosConceptSchemes.clear();
+
     // create the new skos ontology
     skosOntology = manager.createOntology(IRI.create(baseURI));
     createConceptScheme();
@@ -171,6 +181,7 @@ public class Obo2Skos {
               factory.getOWLNamedIndividual(baseURI + frag + fragment);
           axioms.add(getSKOSConceptAxiom(concept));
           conceptsCreated.increment();
+          convertedConcepts.add(concept);
 
           // get the sub and super classes, convert to SKOS Concepts, include broader/narrower relationships
           addSKOSRelationships(concept, EntitySearcher.getSuperClasses(cls, inputOntology));
@@ -183,11 +194,18 @@ public class Obo2Skos {
 
     // gather all the axioms and commit them to the new ontology
     for (final OWLAxiom ax : axioms) {
-      final AddAxiom add = new AddAxiom(skosOntology, ax);
-      try {
-        manager.applyChange(add);
-      } catch (OWLOntologyChangeException e) {
-        log.error("Error adding axiom {}", ax, e);
+      final boolean hasSkippedConcepts = includeRelationsToExternalConcepts ||
+          ax.unsortedSignature()
+          .filter(e -> e instanceof OWLNamedIndividual)
+          .anyMatch(e -> !convertedConcepts.contains(e));
+
+      if (includeRelationsToExternalConcepts || !hasSkippedConcepts) {
+        final AddAxiom add = new AddAxiom(skosOntology, ax);
+        try {
+          manager.applyChange(add);
+        } catch (OWLOntologyChangeException e) {
+          log.error("Error adding axiom {}", ax, e);
+        }
       }
     }
   }
@@ -240,9 +258,9 @@ public class Obo2Skos {
   private OWLIndividual getSkosScheme(final String schemeName) {
     return skosConceptSchemes.compute(schemeName, (name, scheme) -> {
       if (scheme == null) {
-        final OWLIndividual skosConceptScheme =
+        final OWLNamedIndividual skosConceptScheme =
             factory.getOWLNamedIndividual(baseURI + frag + name);
-
+        convertedConcepts.add(skosConceptScheme);
         axioms.add(factory.getOWLClassAssertionAxiom(skosConceptSchemeClass, skosConceptScheme));
 
         scheme = skosConceptScheme;
@@ -265,14 +283,9 @@ public class Obo2Skos {
       final Stream<OWLClassExpression> superClasses) {
     superClasses.forEach(superClass -> {
       if (superClass.equals(factory.getOWLThing())) {
-        // make the concept top concept
-        final OWLObjectProperty hasTopConcept =
-            factory.getOWLObjectProperty(SKOSVocabulary.HASTOPCONCEPT);
         axioms.add(factory
-            .getOWLObjectPropertyAssertionAxiom(hasTopConcept, skosConceptScheme, concept));
-      }
-
-      if (superClass instanceof OWLClass) {
+            .getOWLObjectPropertyAssertionAxiom(topConceptProperty, skosConceptScheme, concept));
+      } else if (superClass instanceof OWLClass) {
         // this class is broader than the current class
         final OWLNamedIndividual broaderConcept = factory.getOWLNamedIndividual(
             baseURI + frag + superClass.asOWLClass().getIRI().getFragment());
@@ -281,7 +294,7 @@ public class Obo2Skos {
         // add the property assertion (and the inverse)
         axioms.add(factory.getOWLObjectPropertyAssertionAxiom(broaderProperty, concept, broaderConcept));
         axioms.add(factory.getOWLObjectPropertyAssertionAxiom(narrowerProperty, broaderConcept, concept));
-      } else if (superClass instanceof OWLObjectSomeValuesFrom) {
+      } else if (includeUnmappedRelations && superClass instanceof OWLObjectSomeValuesFrom) {
         /*
          * create the skos:related relationships
          * It is here that you would need to do any manual mapping for certain ObjectProperties to Broader or Narrower
@@ -344,6 +357,14 @@ public class Obo2Skos {
     this.includeUnmappedProperties = includeUnmappedProperties;
   }
 
+  public void setIncludeUnmappedRelations(boolean includeUnmappedRelations) {
+    this.includeUnmappedRelations = includeUnmappedRelations;
+  }
+
+  public void setIncludeRelationsToExternalConcepts(boolean includeRelationsToExternalConcepts) {
+    this.includeRelationsToExternalConcepts = includeRelationsToExternalConcepts;
+  }
+
   private static <T> T parseCLIOptions(final String[] args,
       final Class<T> optionsClass,
       final Class<?> callerClass) {
@@ -385,6 +406,8 @@ public class Obo2Skos {
     obo2skos.setIncludeNamespaces(options.getIncludeNamespaces());
     obo2skos.setExcludeNamespaces(options.getExcludeNamespaces());
     obo2skos.setIncludeUnmappedProperties(options.isIncludeUnmappedProperties());
+    obo2skos.setIncludeUnmappedRelations(options.isIncludeUnmappedRelations());
+    obo2skos.setIncludeRelationsToExternalConcepts(options.isIncludeRelationsToExternalConcepts());
 
     log.info("Converting...");
     final OWLOntology skos = obo2skos.convert();

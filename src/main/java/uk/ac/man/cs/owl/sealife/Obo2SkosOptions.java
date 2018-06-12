@@ -22,8 +22,12 @@ public class Obo2SkosOptions {
   private List<String> includeNamespaces;
   @Option(name = "-excludeNamespace", usage = "Namespace to exclude. Repeat to exclude several namespaces.")
   private List<String> excludeNamespaces;
-  @Option(name = "-includeUnmappedProperties", usage = "If true, include also unrecognized properties as oboInOwl")
+  @Option(name = "-includeUnmappedProperties", usage = "If true, include unrecognized properties as oboInOwl")
   private boolean includeUnmappedProperties = false;
+  @Option(name = "-includeUnmappedRelations", usage = "If true, include unmapped relations as skos:related")
+  private boolean includeUnmappedRelations = false;
+  @Option(name = "-includeRelationsToExternalConcepts", usage = "If true, include relations to concepts that are not included in conversion")
+  private boolean includeRelationsToExternalConcepts = false;
 
   public Path getInput() {
     return input;
@@ -81,6 +85,22 @@ public class Obo2SkosOptions {
     this.includeUnmappedProperties = includeUnmappedProperties;
   }
 
+  public boolean isIncludeUnmappedRelations() {
+    return includeUnmappedRelations;
+  }
+
+  public void setIncludeUnmappedRelations(boolean includeUnmappedRelations) {
+    this.includeUnmappedRelations = includeUnmappedRelations;
+  }
+
+  public boolean isIncludeRelationsToExternalConcepts() {
+    return includeRelationsToExternalConcepts;
+  }
+
+  public void setIncludeRelationsToExternalConcepts(boolean includeRelationsToExternalConcepts) {
+    this.includeRelationsToExternalConcepts = includeRelationsToExternalConcepts;
+  }
+
   @Override
   public String toString() {
     return "Obo2SkosOptions{" +
@@ -91,6 +111,8 @@ public class Obo2SkosOptions {
         ", includeNamespaces=" + includeNamespaces +
         ", excludeNamespaces=" + excludeNamespaces +
         ", includeUnmappedProperties=" + includeUnmappedProperties +
+        ", includeUnmappedRelations=" + includeUnmappedRelations +
+        ", includeRelationsToExternalConcepts=" + includeRelationsToExternalConcepts +
         '}';
   }
 }
